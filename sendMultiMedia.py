@@ -1,25 +1,28 @@
-from hikkatl.types import (
+from telethon.tl.types import (
     InputPeerEmpty,
     InputMediaUploadedPhoto,
     InputSingleMedia,
     InputPeerSelf
 )
-from hikkatl.functions import InvokeWithLayerRequest
-from hikkatl.types import (
+from telethon.tl.functions import InvokeWithLayerRequest
+from telethon.tl.types import (
     messages,
 )
-from hikkatl.tl import TLRequest
-from hikkatl.types import (
+from telethon.tl import TLRequest
+from telethon.tl.types import (
     InputPeer,
     InputMedia,
 )
-from hikkatl.core import TLObject
-from hikkatl.all import MessageEntityTextUrl
+from telethon.tl.core import TLObject
+from telethon.tl.all import MessageEntityTextUrl
 import random
 from datetime import datetime
 
 
 class MySendMultiMediaRequest(TLRequest):
+    """
+    Собственная реализация запроса messages.sendMultiMedia
+    """
     __slots__ = ['peer', 'reply_to_msg_id', 'multi_media', 'silent', 'background', 'clear_draft', 'schedule_date']
 
     def __init__(self, peer, multi_media, reply_to_msg_id=None, silent=False,
