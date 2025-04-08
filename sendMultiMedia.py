@@ -8,7 +8,7 @@ from hikkatl.functions import InvokeWithLayerRequest
 from hikkatl.types import (
     messages,
 )
-from hikkatl import TLRequest
+from hikkatl.tl import TLRequest
 from hikkatl.types import (
     InputPeer,
     InputMedia,
