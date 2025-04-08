@@ -1,38 +1,28 @@
+from telethon.tl import types, functions
+from telethon.tl.tlobject import TLObject
 from telethon.tl.types import (
-    InputPeerEmpty,
     InputMediaUploadedPhoto,
+    InputMediaUploadedDocument,
     InputSingleMedia,
-    InputPeerSelf
+    InputMediaPhotoExternal,
+    InputPeerUser,
+    InputPeerChat,
+    InputPeerChannel,
+    MessageEntityBold,
+    MessageEntityItalic,
+    InputDocument,
 )
-from telethon.tl.functions import InvokeWithLayerRequest
-from telethon.tl.types import (
-    messages,
-)
-from telethon.tl import TLRequest
-from telethon.tl.types import (
-    InputPeer,
-    InputMedia,
-)
-from telethon.tl.core import TLObject
-from telethon.tl.all import MessageEntityTextUrl
-import random
-from datetime import datetime
+import os
 
+class MySendMultiMediaRequest(TLObject):
+    __slots__ = ["peer", "multi_media", "reply_to", "message", "random_id", "schedule_date"]
 
-class MySendMultiMediaRequest(TLRequest):
-    """
-    Собственная реализация запроса messages.sendMultiMedia
-    """
-    __slots__ = ['peer', 'reply_to_msg_id', 'multi_media', 'silent', 'background', 'clear_draft', 'schedule_date']
-
-    def __init__(self, peer, multi_media, reply_to_msg_id=None, silent=False,
-                 background=False, clear_draft=False, schedule_date=None):
+    def __init__(self, *, peer, multi_media, reply_to=None, message="", random_id=None, schedule_date=None):
         self.peer = peer
         self.multi_media = multi_media
-        self.reply_to_msg_id = reply_to_msg_id
-        self.silent = silent
-        self.background = background
-        self.clear_draft = clear_draft
+        self.reply_to = reply_to
+        self.message = message
+        self.random_id = random_id
         self.schedule_date = schedule_date
 
     def to_dict(self):
@@ -40,50 +30,49 @@ class MySendMultiMediaRequest(TLRequest):
             "_": "messages.sendMultiMedia",
             "peer": self.peer,
             "multi_media": self.multi_media,
-            "reply_to_msg_id": self.reply_to_msg_id,
-            "silent": self.silent,
-            "background": self.background,
-            "clear_draft": self.clear_draft,
-            "schedule_date": self.schedule_date
+            "reply_to": self.reply_to,
+            "message": self.message,
+            "random_id": self.random_id,
+            "schedule_date": self.schedule_date,
         }
 
+    def on_send(self, client):
+        return functions.messages.SendMultiMedia(
+            peer=self.peer,
+            multi_media=self.multi_media,
+            reply_to_msg_id=self.reply_to,
+            message=self.message,
+            random_id=self.random_id or client.rnd_id(),
+            schedule_date=self.schedule_date
+        )
 
-async def custom_send_multi_media(client, peer, photo_paths: list, caption: str = None,
-                                  reply_to_msg_id: int = None, silent: bool = False,
-                                  schedule_date: int = None):
-    """
-    Ручная реализация отправки мультимедиа как альбома, без использования SendMultiMediaRequest из Telethon
-    """
-
-    input_peer = await client.get_input_entity(peer)
-
-    # Загружаем все изображения
-    media_files = []
-    for photo_path in photo_paths:
-        file = await client.upload_file(photo_path)
-        media_files.append(file)
-
-    # Формируем список InputSingleMedia
-    multi_media = []
-    for i, file in enumerate(media_files):
+# Функция для отправки медиа
+async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, reply_to_msg_id=None):
+    media_list = []
+    for path in photo_paths:
+        if not os.path.exists(path):
+            continue
+        file = await client.upload_file(path)
         input_media = InputMediaUploadedPhoto(file=file)
-        multi_media.append(InputSingleMedia(
+        media = InputSingleMedia(
             media=input_media,
-            message=caption if i == 0 and caption else "",
+            message=caption or "",
             entities=[],
-            random_id=random.getrandbits(64)
-        ))
+            random_id=client.rnd_id()
+        )
+        media_list.append(media)
 
-    # Составляем свой объект запроса
-    request = MySendMultiMediaRequest(
-        peer=input_peer,
-        multi_media=multi_media,
-        reply_to_msg_id=reply_to_msg_id,
-        silent=silent,
-        background=False,
-        clear_draft=False,
-        schedule_date=datetime.fromtimestamp(schedule_date) if schedule_date else None
+    if not media_list:
+        return
+
+    peer = await client.get_input_entity(chat_id)
+
+    # Собственный TLRequest
+    req = MySendMultiMediaRequest(
+        peer=peer,
+        multi_media=media_list,
+        reply_to=reply_to_msg_id
     )
 
-    # Отправляем запрос через client._call
-    return await client._call(request)
+    # Отправка
+    await client(req.on_send(client))
