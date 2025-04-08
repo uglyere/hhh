@@ -1,101 +1,86 @@
-import os
-import random
-from hikkatl.types import (  # type: ignore
-    InputPeerUser,
-    InputPeerChat,
-    InputPeerChannel,
+from hikkatl.types import (
+    InputPeerEmpty,
     InputMediaUploadedPhoto,
     InputSingleMedia,
-    InputReplyToMessage,
+    InputPeerSelf
 )
-from hikkatl.functions import InvokeWithLayerRequest  # type: ignore
+from hikkatl.functions import InvokeWithLayerRequest
+from hikkatl.types import (
+    messages,
+)
+from hikkatl import TLRequest
+from hikkatl.types import (
+    InputPeer,
+    InputMedia,
+)
+from hikkatl.core import TLObject
+from hikkatl.all import MessageEntityTextUrl
+import random
+from datetime import datetime
 
 
-async def send_photo_album(
-    client,
-    peer,
-    photo_paths,
-    caption=None,
-    reply_to_msg_id=None,
-    silent=False,
-    background=False,
-    clear_draft=False,
-    noforwards=False,
-    schedule_date=None,
-):
+class MySendMultiMediaRequest(TLRequest):
+    __slots__ = ['peer', 'reply_to_msg_id', 'multi_media', 'silent', 'background', 'clear_draft', 'schedule_date']
+
+    def __init__(self, peer, multi_media, reply_to_msg_id=None, silent=False,
+                 background=False, clear_draft=False, schedule_date=None):
+        self.peer = peer
+        self.multi_media = multi_media
+        self.reply_to_msg_id = reply_to_msg_id
+        self.silent = silent
+        self.background = background
+        self.clear_draft = clear_draft
+        self.schedule_date = schedule_date
+
+    def to_dict(self):
+        return {
+            "_": "messages.sendMultiMedia",
+            "peer": self.peer,
+            "multi_media": self.multi_media,
+            "reply_to_msg_id": self.reply_to_msg_id,
+            "silent": self.silent,
+            "background": self.background,
+            "clear_draft": self.clear_draft,
+            "schedule_date": self.schedule_date
+        }
+
+
+async def custom_send_multi_media(client, peer, photo_paths: list, caption: str = None,
+                                  reply_to_msg_id: int = None, silent: bool = False,
+                                  schedule_date: int = None):
     """
-    Send an album of photos only
-
-    Args:
-        client: Authenticated TelegramClient instance
-        peer: Target chat (username, ID, or InputPeer)
-        photo_paths: List of paths to photo files
-        caption: Optional caption for the album
-        reply_to_msg_id: Message ID to reply to
-        silent: Send silently (no notifications)
-        background: Send in background
-        clear_draft: Clear the draft after sending
-        noforwards: Disable forwarding
-        schedule_date: Unix timestamp for scheduled sending
+    Ручная реализация отправки мультимедиа как альбома, без использования SendMultiMediaRequest из Telethon
     """
 
-    # Resolve the peer if not already an InputPeer
-    if not isinstance(peer, (InputPeerUser, InputPeerChat, InputPeerChannel)):
-        peer = await client.get_input_entity(peer)
+    input_peer = await client.get_input_entity(peer)
 
-    # Prepare the reply_to parameter if needed
-    reply_to = None
-    if reply_to_msg_id:
-        reply_to = InputReplyToMessage(reply_to_msg_id)
-
-    # Upload all photos
-    uploaded_photos = []
+    # Загружаем все изображения
+    media_files = []
     for photo_path in photo_paths:
         file = await client.upload_file(photo_path)
-        input_media = InputMediaUploadedPhoto(file)
-        uploaded_photos.append(input_media)
+        media_files.append(file)
 
-    # Prepare InputSingleMedia objects
+    # Формируем список InputSingleMedia
     multi_media = []
-    for media in uploaded_photos:
-        multi_media.append(
-            InputSingleMedia(
-                media=media,
-                random_id=random.randint(0, 0x7FFFFFFF),
-                message=caption if caption else "",
-                entities=None,
-            )
-        )
+    for i, file in enumerate(media_files):
+        input_media = InputMediaUploadedPhoto(file=file)
+        multi_media.append(InputSingleMedia(
+            media=input_media,
+            message=caption if i == 0 and caption else "",
+            entities=[],
+            random_id=random.getrandbits(64)
+        ))
 
-    # Prepare flags
-    flags = 0
-    if silent:
-        flags |= 1 << 5
-    if background:
-        flags |= 1 << 6
-    if clear_draft:
-        flags |= 1 << 7
-    if noforwards:
-        flags |= 1 << 14
-    if reply_to is not None:
-        flags |= 1 << 0
-    if schedule_date is not None:
-        flags |= 1 << 10
+    # Составляем свой объект запроса
+    request = MySendMultiMediaRequest(
+        peer=input_peer,
+        multi_media=multi_media,
+        reply_to_msg_id=reply_to_msg_id,
+        silent=silent,
+        background=False,
+        clear_draft=False,
+        schedule_date=datetime.fromtimestamp(schedule_date) if schedule_date else None
+    )
 
-    # Construct the request
-    request = {
-        "_": "messages.sendMultiMedia",
-        "flags": flags,
-        "peer": peer,
-        "multi_media": multi_media,
-        "reply_to": reply_to,
-        "schedule_date": schedule_date,
-    }
-
-    # Remove None values
-    request = {k: v for k, v in request.items() if v is not None}
-
-    # Send the request
-    result = await client(InvokeWithLayerRequest(layer=195, query=request))
-
-    return result
+    # Отправляем запрос через client._call
+    return await client._call(request)
