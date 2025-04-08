@@ -15,6 +15,38 @@ from telethon.tl.types import (
 import os
 import random
 
+class InputReplyToMessage(TLObject):
+    CONSTRUCTOR_ID = 0x708866e5
+
+    def __init__(self, *, reply_to_msg_id, top_msg_id=None, quote_text=None, quote_entities=None, quote_offset=None):
+        self.reply_to_msg_id = reply_to_msg_id
+        self.top_msg_id = top_msg_id
+        self.quote_text = quote_text
+        self.quote_entities = quote_entities
+        self.quote_offset = quote_offset
+
+    def __bytes__(self):
+        flags = 0
+        if self.top_msg_id is not None:
+            flags |= 1 << 0
+        if self.quote_text is not None:
+            flags |= 1 << 1
+        if self.quote_entities is not None:
+            flags |= 1 << 2
+        if self.quote_offset is not None:
+            flags |= 1 << 3
+
+        return b''.join((
+            int.to_bytes(self.CONSTRUCTOR_ID, 4, 'little'),
+            int.to_bytes(flags, 4, 'little'),
+            int.to_bytes(self.reply_to_msg_id, 4, 'little'),
+            int.to_bytes(self.top_msg_id, 4, 'little') if self.top_msg_id is not None else b'',
+            self.serialize_bytes(self.quote_text) if self.quote_text is not None else b'',
+            self.serialize_bytes(self.quote_entities) if self.quote_entities is not None else b'',
+            int.to_bytes(self.quote_offset, 4, 'little') if self.quote_offset is not None else b'',
+        ))
+
+
 class MySendMultiMediaRequest(TLObject):
     CONSTRUCTOR_ID = 0x37b74355
 
