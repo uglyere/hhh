@@ -13,6 +13,7 @@ from telethon.tl.types import (
     InputDocument,
 )
 import os
+import random
 
 class MySendMultiMediaRequest(TLObject):
     __slots__ = ["peer", "multi_media", "reply_to", "message", "random_id", "schedule_date"]
@@ -58,7 +59,7 @@ async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, re
             media=input_media,
             message=caption or "",
             entities=[],
-            random_id=client.rnd_id()
+            random_id=random.randint(0, 0x7FFFFFFF)
         )
         media_list.append(media)
 
