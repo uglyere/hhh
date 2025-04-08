@@ -43,7 +43,7 @@ class MySendMultiMediaRequest(TLObject):
             multi_media=self.multi_media,
             reply_to_msg_id=self.reply_to,
             message=self.message,
-            random_id=self.random_id or client.rnd_id(),
+            random_id=self.random_id or random.randint(0, 0x7FFFFFFF),
             schedule_date=self.schedule_date
         )
 
