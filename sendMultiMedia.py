@@ -51,15 +51,16 @@ class MySendMultiMediaRequest(TLObject):
             flags |= 1 << 0
         if self.schedule_date is not None:
             flags |= 1 << 10
-
+    
         return b''.join((
             int.to_bytes(self.CONSTRUCTOR_ID, 4, 'little'),
             int.to_bytes(flags, 4, 'little'),
-            self.serialize_bytes(self.peer),
-            self.serialize_bytes(self.reply_to) if self.reply_to else b'',
-            self.serialize_bytes(self.multi_media),
-            self.serialize_bytes(self.schedule_date) if self.schedule_date else b'',
-        ))
+            bytes(self.peer),
+            bytes(self.reply_to) if self.reply_to else b'',
+            b''.join((bytes(x) for x in self.multi_media)),
+            int.to_bytes(self.schedule_date, 4, 'little') if self.schedule_date else b'',
+    ))
+
 
 # Использование
 async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, reply_to_msg_id=None):
