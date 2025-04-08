@@ -81,7 +81,7 @@ async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, re
         return
 
     peer = await client.get_input_entity(chat_id)
-    reply_to = types.InputReplyToMsgId(msg_id=reply_to_msg_id) if reply_to_msg_id else None
+    reply_to = types.InputReplyToMessage(msg_id=reply_to_msg_id) if reply_to_msg_id else None
 
     req = MySendMultiMediaRequest(
         peer=peer,
