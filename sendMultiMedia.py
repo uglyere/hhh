@@ -122,5 +122,5 @@ async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, re
         reply_to=reply_to,
     )
 
-    result = await client._call_function('messages.sendMultiMedia', req)
+    result = await client.invoke('messages.sendMultiMedia', req)
     return result
