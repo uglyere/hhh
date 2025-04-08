@@ -16,17 +16,15 @@ import os
 import random
 
 class MySendMultiMediaRequest(TLObject):
-    CONSTRUCTOR_ID = 0x6e8a74d8  # Это должен быть правильный constructor_id для messages.sendMultiMedia
-    SUBCLASS_OF_ID = 0x8af52aac  # Updates
+    CONSTRUCTOR_ID = 0x37b74355
 
-    __slots__ = ["peer", "multi_media", "reply_to", "message", "random_id", "schedule_date"]
-
-    def __init__(self, *, peer, multi_media, reply_to=None, message="", random_id=None, schedule_date=None):
+    def __init__(self, *, peer, multi_media, reply_to=None, silent=False, background=False, clear_draft=False, schedule_date=None):
         self.peer = peer
         self.multi_media = multi_media
         self.reply_to = reply_to
-        self.message = message
-        self.random_id = random_id
+        self.silent = silent
+        self.background = background
+        self.clear_draft = clear_draft
         self.schedule_date = schedule_date
 
     def to_dict(self):
@@ -35,22 +33,35 @@ class MySendMultiMediaRequest(TLObject):
             "peer": self.peer,
             "multi_media": self.multi_media,
             "reply_to": self.reply_to,
-            "message": self.message,
-            "random_id": self.random_id,
+            "silent": self.silent,
+            "background": self.background,
+            "clear_draft": self.clear_draft,
             "schedule_date": self.schedule_date,
         }
 
     def __bytes__(self):
+        flags = 0
+        if self.silent:
+            flags |= 1 << 5
+        if self.background:
+            flags |= 1 << 6
+        if self.clear_draft:
+            flags |= 1 << 7
+        if self.reply_to is not None:
+            flags |= 1 << 0
+        if self.schedule_date is not None:
+            flags |= 1 << 10
+
         return b''.join((
-            b'\xd8t\x8an',  # CONSTRUCTOR_ID
+            int.to_bytes(self.CONSTRUCTOR_ID, 4, 'little'),
+            int.to_bytes(flags, 4, 'little'),
             self.serialize_bytes(self.peer),
+            self.serialize_bytes(self.reply_to) if self.reply_to else b'',
             self.serialize_bytes(self.multi_media),
-            b'\xb8\x1d\xf5\xa5' if self.reply_to else b'',  # Это Serialize self.reply_to с учетом флага
-            self.serialize_bytes(self.message),
-            self.serialize_bytes(self.random_id or 0),
-            self.serialize_bytes(self.schedule_date) if self.schedule_date else b''
+            self.serialize_bytes(self.schedule_date) if self.schedule_date else b'',
         ))
 
+# Использование
 async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, reply_to_msg_id=None):
     media_list = []
     for path in photo_paths:
@@ -70,13 +81,13 @@ async def custom_send_multi_media(client, chat_id, photo_paths, caption=None, re
         return
 
     peer = await client.get_input_entity(chat_id)
+    reply_to = types.InputReplyToMsgId(msg_id=reply_to_msg_id) if reply_to_msg_id else None
 
     req = MySendMultiMediaRequest(
         peer=peer,
         multi_media=media_list,
-        reply_to=reply_to_msg_id
+        reply_to=reply_to,
     )
 
-    # Отправка запроса
     result = await client._call_function('messages.sendMultiMedia', req)
     return result
